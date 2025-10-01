@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>机器学习算法基准系统</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.2/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.8;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            padding: 20px;
+            min-height: 600px;
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .result-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        select, input, button {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        select, input {
+            background: white;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .status-indicator {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-processing {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .result-content {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .debug-info {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .debug-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #3498db;
+            font-size: 12px;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 12px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .connected {
+            background: #28a745;
+        }
+
+        .disconnected {
+            background: #dc3545;
+        }
+
+        .params-group {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+            margin-bottom: 10px;
+        }
+
+        .param-item {
+            margin-bottom: 8px;
+        }
+
+        .param-item label {
+            font-weight: normal;
+            font-size: 13px;
+            margin-bottom: 3px;
+        }
+
+        .chart-container {
+            margin-top: 15px;
+            height: 300px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>机器学习算法基准系统</h1>
+            <div class="subtitle">十大经典算法 + 前后端分离架构</div>
+        </header>
+
+        <div class="main-content">
+            <div class="control-panel">
+                <h2>算法控制面板</h2>
+
+                <div class="connection-status">
+                    <div class="connection-dot disconnected" id="connectionDot"></div>
+                    <span id="connectionStatus">未连接</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="datasetSelect">选择数据集:</label>
+                    <select id="datasetSelect">
+                        <option value="">-- 请选择数据集 --</option>
+                        <option value="iris">鸢尾花数据集 (Iris)</option>
+                        <option value="wine">葡萄酒数据集 (Wine)</option>
+                        <option value="breast_cancer">乳腺癌数据集 (Breast Cancer)</option>
+                        <option value="digits">手写数字数据集 (Digits)</option>
+                        <option value="diabetes">糖尿病数据集 (Diabetes)</option>
+                        <option value="california_housing">加利福尼亚房价数据集 (California Housing)</option>
+                        <option value="blobs">模拟聚类数据 (Blobs)</option>
+                        <option value="classification">模拟分类数据 (Classification)</option>
+                        <option value="regression">模拟回归数据 (Regression)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="algorithmSelect">选择算法:</label>
+                    <select id="algorithmSelect">
+                        <option value="">-- 请选择算法 --</option>
+                        <optgroup label="分类算法">
+                            <option value="decision_tree_clf">决策树分类 (Decision Tree)</option>
+                            <option value="svm_clf">支持向量机 (SVM)</option>
+                            <option value="knn_clf">K近邻 (KNN)</option>
+                            <option value="gaussian_nb">高斯朴素贝叶斯 (Gaussian NB)</option>
+                            <option value="logreg_clf">逻辑回归 (Logistic Regression)</option>
+                            <option value="mlp_clf">多层感知机 (MLP)</option>
+                        </optgroup>
+                        <optgroup label="回归算法">
+                            <option value="linear_reg">线性回归 (Linear Regression)</option>
+                            <option value="mlp_reg">神经网络回归 (MLP Regressor)</option>
+                        </optgroup>
+                        <optgroup label="无监督算法">
+                            <option value="kmeans">K均值聚类 (K-Means)</option>
+                            <option value="pca">主成分分析 (PCA)</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div id="paramsContainer" class="params-group" style="display: none;">
+                    <h4>算法参数</h4>
+                    <div id="dynamicParams"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="actionSelect">选择动作:</label>
+                    <select id="actionSelect">
+                        <option value="train">训练 (Train)</option>
+                        <option value="infer">推理 (Infer)</option>
+                        <option value="score">评估 (Score)</option>
+                    </select>
+                </div>
+
+                <button id="runButton" disabled>执行算法</button>
+                <button id="resetButton" style="background: #6c757d;">重置</button>
+
+                <div id="statusMessage" class="status-indicator" style="display: none;"></div>
+            </div>
+
+            <div class="result-panel">
+                <h2>算法结果</h2>
+                <div id="resultContent" class="result-content">
+                    <div style="text-align: center; color: #6c757d; margin-top: 50px;">
+                        <h3>欢迎使用机器学习算法基准系统</h3>
+                        <p>请选择数据集和算法开始测试</p>
+                    </div>
+                </div>
+
+                <div class="debug-info">
+                    <div class="debug-title">调试信息:</div>
+                    <div id="debugLog"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class MLBenchmarkApp {
+            constructor() {
+                this.socket = null;
+                this.isConnected = false;
+                this.isProcessing = false;
+                this.debugLog = [];
+                this.savedState = null;
+
+                this.initializeElements();
+                this.initializeSocket();
+                this.attachEventListeners();
+                this.initializeAlgorithmParams();
+            }
+
+            initializeElements() {
+                this.algorithmSelect = document.getElementById('algorithmSelect');
+                this.datasetSelect = document.getElementById('datasetSelect');
+                this.actionSelect = document.getElementById('actionSelect');
+                this.runButton = document.getElementById('runButton');
+                this.resetButton = document.getElementById('resetButton');
+                this.resultContent = document.getElementById('resultContent');
+                this.debugLogElement = document.getElementById('debugLog');
+                this.connectionStatus = document.getElementById('connectionStatus');
+                this.connectionDot = document.getElementById('connectionDot');
+                this.statusMessage = document.getElementById('statusMessage');
+                this.paramsContainer = document.getElementById('paramsContainer');
+                this.dynamicParams = document.getElementById('dynamicParams');
+            }
+
+            initializeAlgorithmParams() {
+                this.algorithmParams = {
+                    // 分类算法参数
+                    decision_tree_clf: [
+                        { key: 'max_depth', label: '最大深度', type: 'number', default: 10, min: 1, max: 50 },
+                        { key: 'min_samples_split', label: '最小分裂样本数', type: 'number', default: 2, min: 2, max: 20 }
+                    ],
+                    svm_clf: [
+                        { key: 'lr', label: '学习率', type: 'number', default: 0.01, min: 0.001, max: 1.0, step: 0.001 },
+                        { key: 'epochs', label: '迭代次数', type: 'number', default: 200, min: 10, max: 1000 },
+                        { key: 'C', label: '惩罚系数', type: 'number', default: 1.0, min: 0.1, max: 10.0, step: 0.1 }
+                    ],
+                    knn_clf: [
+                        { key: 'k', label: '近邻数', type: 'number', default: 5, min: 1, max: 20 },
+                        { key: 'weighted', label: '加权投票', type: 'select', options: [
+                            { label: '是', value: true },
+                            { label: '否', value: false }
+                        ], default: false }
+                    ],
+                    gaussian_nb: [
+                        { key: 'eps', label: '平滑系数', type: 'number', default: 1e-9, min: 1e-12, max: 1e-5, step: 1e-9 }
+                    ],
+                    logreg_clf: [
+                        { key: 'lr', label: '学习率', type: 'number', default: 0.1, min: 0.001, max: 1.0, step: 0.01 },
+                        { key: 'epochs', label: '迭代次数', type: 'number', default: 200, min: 10, max: 1000 },
+                        { key: 'l2', label: 'L2正则化', type: 'number', default: 0.0, min: 0.0, max: 1.0, step: 0.1 }
+                    ],
+                    mlp_clf: [
+                        { key: 'hidden', label: '隐藏层大小', type: 'number', default: 64, min: 8, max: 256 },
+                        { key: 'lr', label: '学习率', type: 'number', default: 0.1, min: 0.001, max: 1.0, step: 0.01 },
+                        { key: 'epochs', label: '迭代次数', type: 'number', default: 200, min: 10, max: 1000 },
+                        { key: 'batch_size', label: '批大小', type: 'number', default: 32, min: 8, max: 128 }
+                    ],
+                    // 回归算法参数
+                    linear_reg: [
+                        { key: 'l2', label: 'L2正则化', type: 'number', default: 0.0, min: 0.0, max: 1.0, step: 0.1 }
+                    ],
+                    mlp_reg: [
+                        { key: 'hidden', label: '隐藏层大小', type: 'number', default: 64, min: 8, max: 256 },
+                        { key: 'lr', label: '学习率', type: 'number', default: 0.01, min: 0.001, max: 1.0, step: 0.001 },
+                        { key: 'epochs', label: '迭代次数', type: 'number', default: 300, min: 10, max: 1000 },
+                        { key: 'batch_size', label: '批大小', type: 'number', default: 32, min: 8, max: 128 }
+                    ],
+                    // 无监督算法参数
+                    kmeans: [
+                        { key: 'k', label: '聚类簇数', type: 'number', default: 3, min: 2, max: 20 },
+                        { key: 'max_iter', label: '最大迭代次数', type: 'number', default: 200, min: 10, max: 1000 }
+                    ],
+                    pca: [
+                        { key: 'n_components', label: '降维维度', type: 'number', default: 2, min: 1, max: 10 },
+                        { key: 'whiten', label: '是否白化', type: 'select', options: [
+                            { label: '是', value: true },
+                            { label: '否', value: false }
+                        ], default: false }
+                    ]
+                };
+            }
+
+            initializeSocket() {
+                this.socket = io();
+
+                this.socket.on('connect', () => {
+                    this.logDebug('✅ 已连接到服务器');
+                    this.updateConnectionStatus(true);
+                });
+
+                this.socket.on('disconnect', () => {
+                    this.logDebug('❌ 与服务器断开连接');
+                    this.updateConnectionStatus(false);
+                });
+
+                this.socket.on('connection_response', (data) => {
+                    this.logDebug(`服务器响应: ${data.message}`);
+                });
+
+                this.socket.on('algorithm_status', (data) => {
+                    this.showStatusMessage(data.message, 'processing');
+                    this.logDebug(`算法状态: ${data.status} - ${data.message}`);
+                });
+
+                this.socket.on('algorithm_result', (data) => {
+                    this.displayResult(data);
+                    this.showStatusMessage('算法执行完成', 'completed');
+                    this.isProcessing = false;
+                    this.updateRunButton();
+                    this.logDebug('✅ 算法执行完成');
+                });
+
+                this.socket.on('algorithm_error', (data) => {
+                    this.displayError(data.error);
+                    this.showStatusMessage('执行出错', 'error');
+                    this.isProcessing = false;
+                    this.updateRunButton();
+                    this.logDebug(`❌ 错误: ${data.error}`);
+                });
+            }
+
+            attachEventListeners() {
+                this.runButton.addEventListener('click', () => {
+                    this.runAlgorithm();
+                });
+
+                this.resetButton.addEventListener('click', () => {
+                    this.resetForm();
+                });
+
+                this.algorithmSelect.addEventListener('change', () => {
+                    this.updateAlgorithmParams();
+                    this.updateRunButton();
+                });
+
+                this.datasetSelect.addEventListener('change', () => {
+                    this.updateRunButton();
+                });
+
+                this.actionSelect.addEventListener('change', () => {
+                    this.updateRunButton();
+                });
+            }
+
+            updateConnectionStatus(connected) {
+                this.isConnected = connected;
+                this.connectionStatus.textContent = connected ? '已连接' : '未连接';
+                this.connectionDot.className = `connection-dot ${connected ? 'connected' : 'disconnected'}`;
+                this.updateRunButton();
+            }
+
+            updateRunButton() {
+                const algorithmSelected = this.algorithmSelect.value !== '';
+                const datasetSelected = this.datasetSelect.value !== '';
+
+                this.runButton.disabled = !(this.isConnected && algorithmSelected && datasetSelected && !this.isProcessing);
+                this.runButton.textContent = this.isProcessing ? '执行中...' : '执行算法';
+            }
+
+            updateAlgorithmParams() {
+                const algorithm = this.algorithmSelect.value;
+
+                if (!algorithm || !this.algorithmParams[algorithm]) {
+                    this.paramsContainer.style.display = 'none';
+                    this.dynamicParams.innerHTML = '';
+                    return;
+                }
+
+                this.paramsContainer.style.display = 'block';
+                this.dynamicParams.innerHTML = '';
+
+                const params = this.algorithmParams[algorithm];
+                params.forEach(param => {
+                    const paramDiv = document.createElement('div');
+                    paramDiv.className = 'param-item';
+
+                    const label = document.createElement('label');
+                    label.textContent = param.label;
+                    label.htmlFor = `param_${param.key}`;
+
+                    let input;
+                    if (param.type === 'select') {
+                        input = document.createElement('select');
+                        input.id = `param_${param.key}`;
+                        param.options.forEach(option => {
+                            const optionElement = document.createElement('option');
+                            optionElement.value = option.value;
+                            optionElement.textContent = option.label;
+                            if (option.value === param.default) {
+                                optionElement.selected = true;
+                            }
+                            input.appendChild(optionElement);
+                        });
+                    } else {
+                        input = document.createElement('input');
+                        input.type = param.type;
+                        input.id = `param_${param.key}`;
+                        input.value = param.default || '';
+                        if (param.min !== undefined) input.min = param.min;
+                        if (param.max !== undefined) input.max = param.max;
+                        if (param.step !== undefined) input.step = param.step;
+                    }
+
+                    paramDiv.appendChild(label);
+                    paramDiv.appendChild(input);
+                    this.dynamicParams.appendChild(paramDiv);
+                });
+            }
+
+            runAlgorithm() {
+                if (!this.isConnected) {
+                    this.logDebug('❌ 未连接到服务器，无法执行算法');
+                    return;
+                }
+
+                const algorithm = this.algorithmSelect.value;
+                const dataset = this.datasetSelect.value;
+                const action = this.actionSelect.value;
+
+                if (!algorithm || !dataset) {
+                    this.logDebug('❌ 请选择算法和数据集');
+                    return;
+                }
+
+                // 收集参数
+                const params = {};
+                const paramElements = this.dynamicParams.querySelectorAll('input, select');
+                paramElements.forEach(element => {
+                    const key = element.id.replace('param_', '');
+                    if (element.type === 'number') {
+                        params[key] = parseFloat(element.value);
+                    } else if (element.type === 'select-one') {
+                        params[key] = element.value === 'true';
+                    } else {
+                        params[key] = element.value;
+                    }
+                });
+
+                this.isProcessing = true;
+                this.updateRunButton();
+                this.showStatusMessage('正在发送请求...', 'processing');
+
+                this.logDebug(`🚀 发送算法执行请求 - 算法: ${algorithm}, 数据集: ${dataset}, 动作: ${action}`);
+
+                const requestData = {
+                    algorithm: algorithm,
+                    dataset: dataset,
+                    action: action,
+                    params: params
+                };
+
+                // 如果是推理动作，添加保存的状态
+                if (action === 'infer' && this.savedState) {
+                    requestData.state = this.savedState;
+                }
+
+                this.socket.emit('run_algorithm', requestData);
+            }
+
+            displayResult(data) {
+                const algorithmNames = {
+                    'decision_tree_clf': '决策树分类',
+                    'svm_clf': '支持向量机',
+                    'knn_clf': 'K近邻',
+                    'gaussian_nb': '高斯朴素贝叶斯',
+                    'logreg_clf': '逻辑回归',
+                    'mlp_clf': '多层感知机',
+                    'linear_reg': '线性回归',
+                    'mlp_reg': '神经网络回归',
+                    'kmeans': 'K均值聚类',
+                    'pca': '主成分分析'
+                };
+
+                const datasetNames = {
+                    'iris': '鸢尾花数据集',
+                    'wine': '葡萄酒数据集',
+                    'breast_cancer': '乳腺癌数据集',
+                    'digits': '手写数字数据集',
+                    'diabetes': '糖尿病数据集',
+                    'california_housing': '加利福尼亚房价数据集',
+                    'blobs': '模拟聚类数据',
+                    'classification': '模拟分类数据',
+                    'regression': '模拟回归数据'
+                };
+
+                const taskTypeNames = {
+                    'classification': '分类',
+                    'regression': '回归',
+                    'unsupervised': '无监督',
+                    'dimensionality_reduction': '降维'
+                };
+
+                let html = `
+                    <h3>${algorithmNames[data.basic_info.algorithm]} - ${datasetNames[data.basic_info.dataset]}</h3>
+                    <div style="display: flex; gap: 20px; margin: 10px 0; font-size: 14px;">
+                        <div><strong>任务类型:</strong> ${taskTypeNames[data.basic_info.task_type]}</div>
+                        <div><strong>执行动作:</strong> ${data.basic_info.action}</div>
+                        <div><strong>执行时间:</strong> ${new Date().toLocaleString()}</div>
+                    </div>
+                `;
+
+                // 显示指标
+                if (Object.keys(data.metrics).length > 0) {
+                    html += `<h4>评价指标</h4><div class="metrics-grid">`;
+
+                    for (const [key, value] of Object.entries(data.metrics)) {
+                        let displayValue = value;
+                        let displayKey = key;
+
+                        if (key === 'accuracy') {
+                            displayValue = (value * 100).toFixed(2) + '%';
+                            displayKey = '准确率';
+                        } else if (key === 'mse') {
+                            displayValue = value.toFixed(4);
+                            displayKey = '均方误差';
+                        } else if (key === 'mae') {
+                            displayValue = value.toFixed(4);
+                            displayKey = '平均绝对误差';
+                        } else if (key === 'inertia') {
+                            displayValue = value.toFixed(4);
+                            displayKey = '惯性';
+                        } else if (key === 'explained_variance_ratio') {
+                            displayValue = value.map(v => (v * 100).toFixed(2) + '%').join(', ');
+                            displayKey = '解释方差比';
+                        } else if (key === 'cumulative_explained_variance') {
+                            displayValue = (value[value.length - 1] * 100).toFixed(2) + '%';
+                            displayKey = '累计解释方差';
+                        }
+
+                        html += `
+                            <div class="metric-card">
+                                <div class="metric-value">${displayValue}</div>
+                                <div class="metric-label">${displayKey}</div>
+                            </div>
+                        `;
+                    }
+                    html += `</div>`;
+                }
+
+                // 显示聚类中心（KMeans）
+                if (data.cluster_centers) {
+                    html += `<h4>聚类中心</h4><pre>${JSON.stringify(data.cluster_centers, null, 2)}</pre>`;
+                }
+
+                // 显示预测结果样例
+                if (data.y_pred && data.y_pred.length > 0) {
+                    const sampleSize = Math.min(10, data.y_pred.length);
+                    const samplePred = data.y_pred.slice(0, sampleSize);
+                    html += `<h4>预测结果（前${sampleSize}个）</h4><pre>${JSON.stringify(samplePred, null, 2)}</pre>`;
+                }
+
+                // 显示概率结果样例（分类算法）
+                if (data.y_proba && data.y_proba.length > 0) {
+                    const sampleSize = Math.min(5, data.y_proba.length);
+                    const sampleProba = data.y_proba.slice(0, sampleSize);
+                    html += `<h4>概率预测（前${sampleSize}个）</h4><pre>${JSON.stringify(sampleProba, null, 2)}</pre>`;
+                }
+
+                // 可视化图表
+                if (data.basic_info.algorithm === 'pca' && data.y_pred && data.y_pred.length > 0) {
+                    html += `<h4>PCA降维可视化</h4><div id="pcaChart" class="chart-container"></div>`;
+                }
+
+                // 保存模型状态按钮（训练后）
+                if (data.basic_info.action === 'train' && data.state) {
+                    html += `
+                        <div style="margin-top: 20px;">
+                            <button onclick="app.saveModelState()" style="background: #28a745; width: auto; padding: 8px 16px;">
+                                💾 保存模型状态（用于推理）
+                            </button>
+                        </div>
+                    `;
+                    this.savedState = data.state;
+                }
+
+                this.resultContent.innerHTML = html;
+
+                // 渲染图表
+                if (data.basic_info.algorithm === 'pca') {
+                    this.renderPCAChart(data.y_pred);
+                }
+            }
+
+            renderPCAChart(y_pred) {
+                const chart = echarts.init(document.getElementById('pcaChart'));
+
+                // 提取前两维数据
+                const data = y_pred.map(point => [point[0], point[1]]);
+
+                const option = {
+                    title: {
+                        text: 'PCA降维结果（前2维）',
+                        left: 'center'
+                    },
+                    xAxis: {
+                        type: 'value',
+                        name: '主成分1'
+                    },
+                    yAxis: {
+                        type: 'value',
+                        name: '主成分2'
+                    },
+                    series: [{
+                        type: 'scatter',
+                        data: data,
+                        symbolSize: 8,
+                        itemStyle: {
+                            color: '#5470c6'
+                        }
+                    }],
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: function (params) {
+                            return `PC1: ${params.value[0].toFixed(4)}<br/>PC2: ${params.value[1].toFixed(4)}`;
+                        }
+                    }
+                };
+
+                chart.setOption(option);
+            }
+
+            displayError(error) {
+                this.resultContent.innerHTML = `
+                    <div style="color: #dc3545; text-align: center; margin-top: 50px;">
+                        <h3>❌ 执行出错</h3>
+                        <p>${error}</p>
+                    </div>
+                `;
+            }
+
+            showStatusMessage(message, type) {
+                this.statusMessage.textContent = message;
+                this.statusMessage.className = `status-indicator status-${type}`;
+                this.statusMessage.style.display = 'block';
+
+                setTimeout(() => {
+                    this.statusMessage.style.display = 'none';
+                }, 3000);
+            }
+
+            saveModelState() {
+                if (this.savedState) {
+                    localStorage.setItem('mlModelState', JSON.stringify(this.savedState));
+                    this.showStatusMessage('模型状态已保存！', 'completed');
+                    this.logDebug('💾 模型状态已保存到本地存储');
+                }
+            }
+
+            loadModelState() {
+                const saved = localStorage.getItem('mlModelState');
+                if (saved) {
+                    this.savedState = JSON.parse(saved);
+                    this.logDebug('📂 已加载历史模型状态');
+                }
+            }
+
+            resetForm() {
+                this.algorithmSelect.value = '';
+                this.datasetSelect.value = '';
+                this.actionSelect.value = 'train';
+                this.paramsContainer.style.display = 'none';
+                this.dynamicParams.innerHTML = '';
+                this.resultContent.innerHTML = `
+                    <div style="text-align: center; color: #6c757d; margin-top: 50px;">
+                        <h3>欢迎使用机器学习算法基准系统</h3>
+                        <p>请选择数据集和算法开始测试</p>
+                    </div>
+                `;
+                this.updateRunButton();
+                this.logDebug('🔄 表单已重置');
+            }
+
+            logDebug(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.debugLog.unshift(`[${timestamp}] ${message}`);
+
+                if (this.debugLog.length > 15) {
+                    this.debugLog.pop();
+                }
+
+                this.debugLogElement.innerHTML = this.debugLog.join('<br>');
+            }
+        }
+
+        // 初始化应用
+        let app;
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new MLBenchmarkApp();
+            app.loadModelState();
+        });
+    </script>
+</body>
+</html>
