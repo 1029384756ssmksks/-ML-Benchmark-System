@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深度学习算法演示系统</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.8;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .result-panel {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        select, button {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        select {
+            background: white;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .status-indicator {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .status-connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status-processing {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .result-content {
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            margin-top: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .debug-info {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .debug-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #3498db;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .connection-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .connected {
+            background: #28a745;
+        }
+
+        .disconnected {
+            background: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>深度学习算法演示系统</h1>
+            <div class="subtitle">前后端分离架构 - WebSocket实时通信</div>
+        </header>
+
+        <div class="main-content">
+            <div class="control-panel">
+                <h2>算法控制面板</h2>
+
+                <div class="connection-status">
+                    <div class="connection-dot disconnected" id="connectionDot"></div>
+                    <span id="connectionStatus">未连接</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="algorithmSelect">选择算法:</label>
+                    <select id="algorithmSelect">
+                        <option value="">-- 请选择算法 --</option>
+                        <option value="linear_regression">线性回归 (Linear Regression)</option>
+                        <option value="logistic_regression">逻辑回归 (Logistic Regression)</option>
+                        <option value="decision_tree">决策树 (Decision Tree)</option>
+                        <option value="random_forest">随机森林 (Random Forest)</option>
+                        <option value="svm">支持向量机 (SVM)</option>
+                        <option value="kmeans">K均值聚类 (K-Means)</option>
+                        <option value="neural_network">神经网络 (Neural Network)</option>
+                        <option value="pca">主成分分析 (PCA)</option>
+                        <option value="knn">K近邻 (K-NN)</option>
+                        <option value="gradient_boosting">梯度提升 (Gradient Boosting)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="datasetSelect">选择数据集:</label>
+                    <select id="datasetSelect">
+                        <option value="">-- 请选择数据集 --</option>
+                        <option value="iris">鸢尾花数据集 (Iris)</option>
+                        <option value="diabetes">糖尿病数据集 (Diabetes)</option>
+                        <option value="boston">波士顿房价数据集 (Boston Housing)</option>
+                        <option value="digits">手写数字数据集 (Digits)</option>
+                        <option value="wine">葡萄酒数据集 (Wine)</option>
+                        <option value="breast_cancer">乳腺癌数据集 (Breast Cancer)</option>
+                    </select>
+                </div>
+
+                <button id="runButton" disabled>执行算法</button>
+
+                <div id="statusMessage" class="status-indicator" style="display: none;"></div>
+            </div>
+
+            <div class="result-panel">
+                <h2>算法结果</h2>
+                <div id="resultContent" class="result-content">
+                    <p style="text-align: center; color: #6c757d;">请选择算法和数据集并点击执行</p>
+                </div>
+
+                <div class="debug-info">
+                    <div class="debug-title">调试信息:</div>
+                    <div id="debugLog"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class DeepLearningApp {
+            constructor() {
+                this.socket = null;
+                this.isConnected = false;
+                this.isProcessing = false;
+                this.debugLog = [];
+
+                this.initializeElements();
+                this.initializeSocket();
+                this.attachEventListeners();
+            }
+
+            initializeElements() {
+                this.algorithmSelect = document.getElementById('algorithmSelect');
+                this.datasetSelect = document.getElementById('datasetSelect');
+                this.runButton = document.getElementById('runButton');
+                this.resultContent = document.getElementById('resultContent');
+                this.debugLogElement = document.getElementById('debugLog');
+                this.connectionStatus = document.getElementById('connectionStatus');
+                this.connectionDot = document.getElementById('connectionDot');
+                this.statusMessage = document.getElementById('statusMessage');
+            }
+
+            initializeSocket() {
+                // 连接到后端Socket.IO服务器
+                this.socket = io();
+
+                this.socket.on('connect', () => {
+                    this.logDebug('✅ 已连接到服务器');
+                    this.updateConnectionStatus(true);
+                });
+
+                this.socket.on('disconnect', () => {
+                    this.logDebug('❌ 与服务器断开连接');
+                    this.updateConnectionStatus(false);
+                });
+
+                this.socket.on('connection_response', (data) => {
+                    this.logDebug(`服务器响应: ${data.message}`);
+                });
+
+                this.socket.on('algorithm_status', (data) => {
+                    this.showStatusMessage(data.message, 'processing');
+                    this.logDebug(`算法状态: ${data.status} - ${data.message}`);
+                });
+
+                this.socket.on('algorithm_result', (data) => {
+                    this.displayResult(data);
+                    this.showStatusMessage('算法执行完成', 'completed');
+                    this.isProcessing = false;
+                    this.updateRunButton();
+                    this.logDebug('✅ 算法执行完成');
+                });
+
+                this.socket.on('algorithm_error', (data) => {
+                    this.displayError(data.error);
+                    this.showStatusMessage('执行出错', 'error');
+                    this.isProcessing = false;
+                    this.updateRunButton();
+                    this.logDebug(`❌ 错误: ${data.error}`);
+                });
+
+                this.socket.on('pong', (data) => {
+                    this.logDebug(`收到pong: ${data.message}`);
+                });
+            }
+
+            attachEventListeners() {
+                this.runButton.addEventListener('click', () => {
+                    this.runAlgorithm();
+                });
+
+                this.algorithmSelect.addEventListener('change', () => {
+                    this.updateRunButton();
+                });
+
+                this.datasetSelect.addEventListener('change', () => {
+                    this.updateRunButton();
+                });
+            }
+
+            updateConnectionStatus(connected) {
+                this.isConnected = connected;
+                this.connectionStatus.textContent = connected ? '已连接' : '未连接';
+                this.connectionDot.className = `connection-dot ${connected ? 'connected' : 'disconnected'}`;
+                this.updateRunButton();
+            }
+
+            updateRunButton() {
+                const algorithmSelected = this.algorithmSelect.value !== '';
+                const datasetSelected = this.datasetSelect.value !== '';
+
+                this.runButton.disabled = !(this.isConnected && algorithmSelected && datasetSelected && !this.isProcessing);
+                this.runButton.textContent = this.isProcessing ? '执行中...' : '执行算法';
+            }
+
+            runAlgorithm() {
+                if (!this.isConnected) {
+                    this.logDebug('❌ 未连接到服务器，无法执行算法');
+                    return;
+                }
+
+                const algorithm = this.algorithmSelect.value;
+                const dataset = this.datasetSelect.value;
+
+                if (!algorithm || !dataset) {
+                    this.logDebug('❌ 请选择算法和数据集');
+                    return;
+                }
+
+                this.isProcessing = true;
+                this.updateRunButton();
+                this.showStatusMessage('正在发送请求...', 'processing');
+
+                this.logDebug(`🚀 发送算法执行请求 - 算法: ${algorithm}, 数据集: ${dataset}`);
+
+                this.socket.emit('run_algorithm', {
+                    algorithm: algorithm,
+                    dataset: dataset
+                });
+            }
+
+            displayResult(data) {
+                const algorithmNames = {
+                    'linear_regression': '线性回归',
+                    'logistic_regression': '逻辑回归',
+                    'decision_tree': '决策树',
+                    'random_forest': '随机森林',
+                    'svm': '支持向量机',
+                    'kmeans': 'K均值聚类',
+                    'neural_network': '神经网络',
+                    'pca': '主成分分析',
+                    'knn': 'K近邻',
+                    'gradient_boosting': '梯度提升'
+                };
+
+                const datasetNames = {
+                    'iris': '鸢尾花数据集',
+                    'diabetes': '糖尿病数据集',
+                    'boston': '波士顿房价数据集',
+                    'digits': '手写数字数据集',
+                    'wine': '葡萄酒数据集',
+                    'breast_cancer': '乳腺癌数据集'
+                };
+
+                const html = `
+                    <h3>${algorithmNames[data.algorithm]} - ${datasetNames[data.dataset]}</h3>
+                    <p><strong>状态:</strong> <span style="color: green;">${data.status}</span></p>
+                    <p><strong>执行时间:</strong> ${new Date().toLocaleString()}</p>
+                    <div style="margin-top: 15px;">
+                        <strong>结果详情:</strong>
+                        <pre style="background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">${JSON.stringify(data.results, null, 2)}</pre>
+                    </div>
+                `;
+
+                this.resultContent.innerHTML = html;
+            }
+
+            displayError(error) {
+                this.resultContent.innerHTML = `
+                    <div style="color: #dc3545; text-align: center;">
+                        <h3>❌ 执行出错</h3>
+                        <p>${error}</p>
+                    </div>
+                `;
+            }
+
+            showStatusMessage(message, type) {
+                this.statusMessage.textContent = message;
+                this.statusMessage.className = `status-indicator status-${type}`;
+                this.statusMessage.style.display = 'block';
+
+                // 3秒后隐藏状态消息
+                setTimeout(() => {
+                    this.statusMessage.style.display = 'none';
+                }, 3000);
+            }
+
+            logDebug(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                this.debugLog.unshift(`[${timestamp}] ${message}`);
+
+                // 保持日志长度
+                if (this.debugLog.length > 20) {
+                    this.debugLog.pop();
+                }
+
+                this.debugLogElement.innerHTML = this.debugLog.join('<br>');
+            }
+        }
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new DeepLearningApp();
+        });
+    </script>
+</body>
+</html>
